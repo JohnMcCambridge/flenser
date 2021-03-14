@@ -1,0 +1,120 @@
+from collections import namedtuple
+import pandas as pd
+import sys
+import os
+
+arguments = sys.argv
+
+df = pd.read_csv(arguments[1], dtype='unicode')
+
+Test = namedtuple('Test', ['name', 'condition', 'to_html'])
+
+tests = [
+    Test(
+        'all_nan',
+        lambda column: column.isnull().all(),
+        lambda column: "NAN only"
+    ),
+    Test(
+        'has_nan',
+        lambda column: column.hasnans,
+        lambda column: "% NAN: " + str((column.isnull().sum().round(2) * 100 / len(column)).round(2))
+    ),
+    Test(
+        'all_cells_same_value',
+        lambda column: len(column.value_counts(dropna=False)) == 1,
+        lambda column: "all cells have same value: " + str(column[0])
+    ),
+    Test(
+        'all_unique',
+        lambda column: max(column.value_counts(dropna=False)) == 1,
+        lambda column: "all non-NAN values are unique"
+    ),
+    Test(
+        'unique_id',
+        lambda column: column.nunique() == len(column),
+        lambda column: "column can function as a unique identifier, first value is of form: " + str(column[0])
+    ),
+    Test(
+        'row_index_0',
+        lambda column: all(column.astype(int, errors='ignore').sort_values().eq(column.index.values)),
+        lambda column: "column values form a row index, initialized at zero"
+    ),
+    Test(
+        'row_index_1',
+        lambda column: all(column.astype(int, errors='ignore').sort_values().eq(column.index.values + 1)),
+        lambda column: "column values form a row index, initialized at one"
+    ),
+    Test(
+        'strip_and_casefold_collapse',
+        lambda column: column.str.strip().str.casefold().nunique == column.nunique(),
+        lambda column: "whitespace and/or casefolding merges one or more values"
+    ),
+    Test(
+        'salesforceid_15',
+        lambda column: column.str.fullmatch("[a-zA-Z0-9]{15}").any(),
+        lambda column: "one of more entries could be Salesforce IDs (15 characters)"
+    ),
+    Test(
+        'salesforceid_18',
+        lambda column: column.str.fullmatch("[a-zA-Z0-9]{18}").any(),
+        lambda column: "one of more entries could be Salesforce IDs (18 characters)"
+    ),
+    Test(
+        'unique_under_max',
+        lambda column: column.nunique() <= 25,
+        lambda column: column.value_counts(normalize=True, dropna=True).round(2).to_markdown(tablefmt='html')
+    )
+]
+
+
+def run_tests(column):
+    tests_passing = []
+    for test in tests:
+        if test.condition(column):
+            tests_passing.append(test)
+    return tests_passing
+
+
+results = df.apply(run_tests, axis=0)
+
+
+def build_output(column_name, column, column_results):
+    html = ""
+    html += """<br><br><b>""" + str(column_name) + """</b><br>"""
+    html += str([result.name for result in column_results]) + """<br>"""
+    html += "Unique Values: " + str(column.nunique())
+    html += """<br><br>"""
+
+    for test in column_results:
+        html += test.to_html(column)
+        html += """<br><br>"""
+    return html
+
+
+def run_page(results):
+    filled_page = ""
+    for i in range(0, len(results)):
+        column_name = results.keys()[i]
+        column_results = results[i]
+
+        column = df[column_name]
+
+        filled_page += build_output(column_name, column, column_results)
+    return filled_page
+
+
+f = open("html_template.html", "r")
+html_open = f.read()
+
+page_output = run_page(results)
+
+html_close = "</body></html>"
+
+html_out = html_open + page_output + html_close
+
+f = open("test_file.html", "w")
+f.write(html_out)
+f.close()
+
+os.system("xdg-open test_file.html")
