@@ -1,24 +1,72 @@
-from collections import namedtuple
 import pandas as pd
 import sys
 import os
+from dataclasses import dataclass
+from typing import Any
+import numpy as np
 
 arguments = sys.argv
 
 df = pd.read_csv(arguments[1], dtype='unicode')
 
-Test = namedtuple('Test', ['name', 'condition', 'to_html'])
+
+@dataclass
+class Test:
+    name: str
+    condition: Any
+    to_html: Any
+
+
+def length_table(column):
+    a = column.str.len().value_counts(normalize=True, dropna=True).round(4) * 100
+    a.index.name = 'Value Lengths'
+    a.name = '% of Total'
+    a = a.to_frame()
+    a['Examples'] = ""
+
+    for i in range(0, len(a)):
+        mask = column.str.len() == a.index[i]
+        if column.loc[mask].nunique() > 3:
+            sample_size = 3
+        else:
+            sample_size = column.loc[mask].nunique()
+        example_values = np.random.choice(column.loc[mask].unique(), sample_size, replace=False)
+        a['Examples'].values[i] = example_values
+
+    a = a.to_markdown(tablefmt='html')
+    return a
+
+
+def unique_table(column):
+    a = column.sort_values().value_counts(normalize=True, dropna=True).round(4) * 100
+    a.index.name = 'Unique Values'
+    a.name = '% of Total'
+    a = a.to_markdown(tablefmt='html')
+    return a
+
+def sample_without_replacement(column):
+    if column.dropna().nunique() > 3:
+        sample_size = 3
+    else:
+        sample_size = column.dropna().nunique()
+    example_values = np.random.choice(column.dropna().unique(), sample_size, replace=False)
+    return example_values
 
 tests = [
     Test(
         'all_nan',
         lambda column: column.isnull().all(),
-        lambda column: "NAN only"
+        lambda column: "NAN values only"
+    ),
+    Test(
+        'not_all_nan',
+        lambda column: not column.isnull().all(),
+        lambda column: "sample values (without replacement): " + str(sample_without_replacement(column))
     ),
     Test(
         'has_nan',
         lambda column: column.hasnans,
-        lambda column: "% NAN: " + str((column.isnull().sum().round(2) * 100 / len(column)).round(2))
+        lambda column: "has NAN values"
     ),
     Test(
         'all_cells_same_value',
@@ -61,10 +109,31 @@ tests = [
         lambda column: "one of more entries could be Salesforce IDs (18 characters)"
     ),
     Test(
+        'numeric_only',
+        lambda column: column.dropna().str.isnumeric().all(),
+        lambda column: "all values are numeric only (or nan)"
+    ),
+    Test(
+        'numeric_only_unique_over_max',
+        lambda column: column.dropna().str.isnumeric().all() & column.nunique() > 25,
+        lambda column: "min value: " + str(column.min(skipna=True)) + "  max value: " + str(column.max(skipna=True))
+    ),
+    Test(
+        'alpha_only',
+        lambda column: column.dropna().str.isalpha().all(),
+        lambda column: "all values are alpha only (or nan) (no spaces, no specials)"
+    ),
+    Test(
+        'common_lengths',
+        lambda column: 0 < column.str.len().nunique() < 5,
+        lambda column: length_table(column)
+    ),
+    Test(
         'unique_under_max',
-        lambda column: column.nunique() <= 25,
-        lambda column: column.value_counts(normalize=True, dropna=True).round(2).to_markdown(tablefmt='html')
+        lambda column: 0 < column.nunique() <= 25,
+        lambda column: unique_table(column)
     )
+
 ]
 
 
@@ -81,9 +150,11 @@ results = df.apply(run_tests, axis=0)
 
 def build_output(column_name, column, column_results):
     html = ""
-    html += """<br><br><b>""" + str(column_name) + """</b><br>"""
-    html += str([result.name for result in column_results]) + """<br>"""
-    html += "Unique Values: " + str(column.nunique())
+    html += """<h1><b>""" + str(column_name) + """</b></h1>"""
+    html += str([result.name for result in column_results]) + """<br><br>"""
+    html += "Unique Values, count: " + str(column.nunique()) + ", as share of non-NAN entries: " + str(round(column.nunique() * 100 / len(column.notnull()), 4)) + "%"
+    html += """<br><br>"""
+    html += "% NAN: " + str((column.isnull().sum().round(2) * 100 / len(column)).round(2))
     html += """<br><br>"""
 
     for test in column_results:
