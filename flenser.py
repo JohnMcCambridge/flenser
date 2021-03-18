@@ -188,11 +188,13 @@ def run_page(results):
 f = open("html_template.html", "r")
 html_open = f.read()
 
+html_top = "Rows: " + str(df.shape[0]) + ", Columns: " + str(df.shape[1])
+
 page_output = run_page(results)
 
 html_close = "</body></html>"
 
-html_out = html_open + page_output + html_close
+html_out = html_open + html_top + page_output + html_close
 
 f = open("flenser_output.html", "w")
 f.write(html_out)
