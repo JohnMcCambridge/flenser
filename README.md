@@ -16,9 +16,9 @@ Additional tests can be added by modifying the `Test` dataclass.
 With thanks to:
 
 Recurse <br>
-Azhad Syed <br>
-Shivam Sharma <br>
-Christina Machak <br>
-Adam Kelly <br>
-Edith Viau <br>
-Justin Reppert <br>
+Azhad S <br>
+Shivam S <br>
+Christina M <br>
+Adam K <br>
+Edith V <br>
+Justin R <br>
