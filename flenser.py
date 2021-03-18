@@ -1,14 +1,18 @@
 import pandas as pd
+import numpy as np
+
 import sys
 import os
 from dataclasses import dataclass
 from typing import Any
-import numpy as np
 
-arguments = sys.argv
 
-df = pd.read_csv(arguments[1], dtype='unicode')
 
+filename = sys.argv[1]
+nans = []
+
+df = pd.read_csv(filename, dtype='object', keep_default_na=True, na_values=nans)
+#print("Loading file, using additional nan values: " + str(nans))
 
 @dataclass
 class Test:
@@ -52,6 +56,7 @@ def sample_without_replacement(column):
     example_values = np.random.choice(column.dropna().unique(), sample_size, replace=False)
     return example_values
 
+
 tests = [
     Test(
         'all_nan',
@@ -61,12 +66,17 @@ tests = [
     Test(
         'not_all_nan',
         lambda column: not column.isnull().all(),
-        lambda column: "sample values (without replacement): " + str(sample_without_replacement(column))
+        lambda column: "sample values, without replacement: " + str(sample_without_replacement(column))
     ),
     Test(
         'has_nan',
         lambda column: column.hasnans,
-        lambda column: "has NAN values"
+        lambda column: "% NAN: " + str((column.isnull().sum().round(2) * 100 / len(column)).round(2)) + ", NAN format(s): " + str(column[column.isna()].unique())
+    ),
+    Test(
+        'no_nan',
+        lambda column: not column.hasnans,
+        lambda column: "% NAN: no NAN values found"
     ),
     Test(
         'all_cells_same_value',
@@ -149,12 +159,12 @@ results = df.apply(run_tests, axis=0)
 
 
 def build_output(column_name, column, column_results):
+    column_results_list = [result.name for result in column_results]
+
     html = ""
     html += """<h1><b>""" + str(column_name) + """</b></h1>"""
-    html += str([result.name for result in column_results]) + """<br><br>"""
+    html += """Triggered Tests: """ + str(column_results_list) + """<br><br>"""
     html += "Unique Values, count: " + str(column.nunique()) + ", as share of non-NAN entries: " + str(round(column.nunique() * 100 / len(column.notnull()), 4)) + "%"
-    html += """<br><br>"""
-    html += "% NAN: " + str((column.isnull().sum().round(2) * 100 / len(column)).round(2))
     html += """<br><br>"""
 
     for test in column_results:
@@ -165,10 +175,10 @@ def build_output(column_name, column, column_results):
 
 def run_page(results):
     filled_page = ""
+    a = results.map(lambda result: [key.name for key in result])
     for i in range(0, len(results)):
         column_name = results.keys()[i]
         column_results = results[i]
-
         column = df[column_name]
 
         filled_page += build_output(column_name, column, column_results)
@@ -184,8 +194,8 @@ html_close = "</body></html>"
 
 html_out = html_open + page_output + html_close
 
-f = open("test_file.html", "w")
+f = open("flenser_output.html", "w")
 f.write(html_out)
 f.close()
 
-os.system("xdg-open test_file.html")
+os.system("xdg-open flenser_output.html")
