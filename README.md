@@ -16,6 +16,8 @@ Additional tests can be added by modifying the `Test` dataclass.
 With thanks to:
 
 Recurse <br>
+Kelly F <br>
+Rebecca H <br>
 Azhad S <br>
 Shivam S <br>
 Christina M <br>
