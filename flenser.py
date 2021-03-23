@@ -9,11 +9,11 @@ from typing import Any
 
 filename = sys.argv[1]
 
-df = pd.read_csv(filename, dtype='object', keep_default_na=False) # do not parse any NANs yet
+df = pd.read_csv(filename, dtype='object', keep_default_na=False)  # do not parse any NANs yet
 
-nans = ['#N/A', '#N/A N/A', '#NA', '-1.#IND', '-1.#QNAN', '-NaN', '-nan', '1.#IND', '1.#QNAN', '<NA>', 'N/A', 'NA', 'NULL', 'NaN', 'n/a', 'nan', 'null']
+nans = ['', '#N/A', '#N/A N/A', '#NA', '-1.#IND', '-1.#QNAN', '-NaN', '-nan', '1.#IND', '1.#QNAN', '<NA>', 'N/A', 'NA', 'NULL', 'NaN', 'n/a', 'nan', 'null']
 found_nans = {x for l in df[df.isin(nans)].values for x in l}
-df = df.replace(nans, np.nan)
+df.replace(nans, pd.NA, inplace=True)
 
 
 @dataclass
@@ -50,6 +50,7 @@ def unique_table(column):
     a = a.to_markdown(tablefmt='html')
     return a
 
+
 def sample_without_replacement(column):
     if column.dropna().nunique() > 3:
         sample_size = 3
@@ -73,7 +74,7 @@ tests = [
     Test(
         'has_nan',
         lambda column: column.hasnans,
-        lambda column: "% NAN: " + str((column.isnull().sum().round(2) * 100 / len(column)).round(2)) + ", NAN format(s): " + str(column[column.isna()].unique())
+        lambda column: "% NAN: " + str((column.isnull().sum().round(2) * 100 / len(column)).round(2))
     ),
     Test(
         'no_nan',
