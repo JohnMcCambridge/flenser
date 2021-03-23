@@ -7,12 +7,14 @@ from dataclasses import dataclass
 from typing import Any
 
 
-
 filename = sys.argv[1]
-nans = []
 
-df = pd.read_csv(filename, dtype='object', keep_default_na=True, na_values=nans)
-#print("Loading file, using additional nan values: " + str(nans))
+df = pd.read_csv(filename, dtype='object', keep_default_na=False) # do not parse any NANs yet
+
+nans = ['#N/A', '#N/A N/A', '#NA', '-1.#IND', '-1.#QNAN', '-NaN', '-nan', '1.#IND', '1.#QNAN', '<NA>', 'N/A', 'NA', 'NULL', 'NaN', 'n/a', 'nan', 'null']
+found_nans = {x for l in df[df.isin(nans)].values for x in l}
+df = df.replace(nans, np.nan)
+
 
 @dataclass
 class Test:
@@ -188,13 +190,14 @@ def run_page(results):
 f = open("html_template.html", "r")
 html_open = f.read()
 
-html_top = "Rows: " + str(df.shape[0]) + ", Columns: " + str(df.shape[1])
+html_row_col = "Rows: " + str(df.shape[0]) + ", Columns: " + str(df.shape[1]) + """<br><br>"""
+html_nan = "NANs found: " + str(found_nans) + """<br>""" + "NANs searched for: " + str(nans)
 
 page_output = run_page(results)
 
 html_close = "</body></html>"
 
-html_out = html_open + html_top + page_output + html_close
+html_out = html_open + html_row_col + html_nan + page_output + html_close
 
 f = open("flenser_output.html", "w")
 f.write(html_out)
