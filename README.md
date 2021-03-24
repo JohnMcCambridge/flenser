@@ -13,7 +13,10 @@ to every column, and show you outputs that will allow your human brain to make d
 
 Additional tests can be added by modifying the `Test` dataclass. 
 
-With thanks to:
+### How to run 
+python3 flenser.py "*filename.csv*"
+
+### With thanks to
 
 Recurse <br>
 Kelly F <br>
