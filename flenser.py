@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 
+import platform
 import sys
 import os
 from dataclasses import dataclass
@@ -178,7 +179,6 @@ def build_output(column_name, column, column_results):
 
 def run_page(results):
     filled_page = ""
-    a = results.map(lambda result: [key.name for key in result])
     for i in range(0, len(results)):
         column_name = results.keys()[i]
         column_results = results[i]
@@ -204,4 +204,8 @@ f = open("flenser_output.html", "w")
 f.write(html_out)
 f.close()
 
-os.system("xdg-open flenser_output.html")
+print("Results saved as 'flenser_output.html'")
+
+if platform.system() == "Linux":
+    print("Attempting to open results in your default browser")
+    os.system("xdg-open flenser_output.html")
