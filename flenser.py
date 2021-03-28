@@ -9,10 +9,18 @@ from typing import Any
 
 
 filename = sys.argv[1]
+extra_nans = sys.argv[2:]
 
 df = pd.read_csv(filename, dtype='object', keep_default_na=False)  # do not parse any NANs yet
 
 nans = ['', '#N/A', '#N/A N/A', '#NA', '-1.#IND', '-1.#QNAN', '-NaN', '-nan', '1.#IND', '1.#QNAN', '<NA>', 'N/A', 'NA', 'NULL', 'NaN', 'n/a', 'nan', 'null']
+nans = nans + extra_nans
+
+if not extra_nans:
+    print("Using standard nan values: " + str(nans))
+if extra_nans:
+    print("Using standard and user-specified nan values: " + str(nans))
+
 found_nans = {x for l in df[df.isin(nans)].values for x in l}
 df.replace(nans, pd.NA, inplace=True)
 
