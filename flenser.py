@@ -154,6 +154,11 @@ tests = [
         'unique_under_max',
         lambda column: 0 < column.nunique() <= 25,
         lambda column: unique_table(column)
+    ),
+    Test(
+        'contains_numeric',
+        lambda column: column.str.isnumeric().any(),
+        lambda column: pd.to_numeric(column, errors='coerce').describe().to_markdown(tablefmt='html')
     )
 
 ]
