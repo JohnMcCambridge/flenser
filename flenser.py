@@ -22,6 +22,13 @@ if extra_nans:
     print("Using standard and user-specified nan values: " + str(nans))
 
 found_nans = {x for l in df[df.isin(nans)].values for x in l}
+
+nan_locations_all = df.apply(lambda column: column[column.isin(found_nans)].unique(), axis = 0)
+nan_locations = nan_locations_all[nan_locations_all.str.len().gt(0)]
+nan_locations.index.name = 'column name'
+nan_locations.name = 'NANs found'
+html_nan_locations = nan_locations.to_markdown(tablefmt='html')
+
 df.replace(nans, pd.NA, inplace=True)
 
 
@@ -205,13 +212,14 @@ f = open("html_template.html", "r")
 html_open = f.read()
 
 html_row_col = "Rows: " + str(df.shape[0]) + ", Columns: " + str(df.shape[1]) + """<br><br>"""
-html_nan = "NANs found: " + str(found_nans) + """<br>""" + "NANs searched for: " + str(nans)
+html_nan = "NANs searched for: " + str(nans) + """<br>""" + "NANs found: " + str(found_nans) + """<br>"""
+html_nan_locations = html_nan_locations + """<br>"""
 
 page_output = run_page(results)
 
 html_close = "</body></html>"
 
-html_out = html_open + html_row_col + html_nan + page_output + html_close
+html_out = html_open + html_row_col + html_nan + html_nan_locations + page_output + html_close
 
 f = open("flenser_output.html", "w")
 f.write(html_out)
