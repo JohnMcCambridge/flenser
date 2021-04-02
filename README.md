@@ -14,11 +14,11 @@ to every column, and show you outputs that will allow your human brain to make d
 Additional tests can be added by modifying the `Test` dataclass. 
 
 ### How to run 
-python3 flenser.py "*filename.csv*"
+python3 flenser.py '*filename.csv*'
 
 Flenser will print its default list of nans. You may specify one or more additional nan values to use, as follows:
 
-python3 flenser.py "*filename.csv*" "*nan1*" "*nan2*" "*nan3*" ...
+python3 flenser.py '*filename.csv*' '*nan1*' '*nan2*' '*nan3*' ...
 
 ### With thanks to
 
