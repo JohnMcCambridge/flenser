@@ -21,7 +21,8 @@ if not extra_nans:
 if extra_nans:
     print("Using standard and user-specified nan values: " + str(nans))
 
-found_nans = {x for l in df[df.isin(nans)].values for x in l}
+found_nans = df[df.isin(nans)].values
+found_nans = np.unique(found_nans[~(pd.isnull(found_nans))])
 
 nan_locations_all = df.apply(lambda column: column[column.isin(found_nans)].unique(), axis = 0)
 nan_locations = nan_locations_all[nan_locations_all.str.len().gt(0)]
@@ -182,6 +183,15 @@ def run_tests(column):
 results = df.apply(run_tests, axis=0)
 
 
+top_table = pd.DataFrame(index=range(len(results)), columns=['Column Name', 'NANs found', 'Tests Triggered'])
+for i in range(0, len(results)):
+    top_table.values[i][0] = results.keys()[i]
+    top_table.values[i][1] = nan_locations_all[i]
+    top_table.values[i][2] = [result.name for result in results[i]]
+
+html_top_table = top_table.to_markdown(tablefmt='html')
+
+
 def build_output(column_name, column, column_results):
     column_results_list = [result.name for result in column_results]
 
@@ -211,15 +221,15 @@ def run_page(results):
 f = open("html_template.html", "r")
 html_open = f.read()
 
+html_filename = str(filename) + """<br><br>"""
 html_row_col = "Rows: " + str(df.shape[0]) + ", Columns: " + str(df.shape[1]) + """<br><br>"""
-html_nan = "NANs searched for: " + str(nans) + """<br>""" + "NANs found: " + str(found_nans) + """<br>"""
-html_nan_locations = html_nan_locations + """<br>"""
+html_nan = "NANs searched for: " + str(nans) + """<br>""" + "NANs found: " + str(found_nans) + """<br><br>"""
 
 page_output = run_page(results)
 
 html_close = "</body></html>"
 
-html_out = html_open + html_row_col + html_nan + html_nan_locations + page_output + html_close
+html_out = html_open + html_filename + html_row_col + html_nan + html_top_table + page_output + html_close
 
 f = open("flenser_output.html", "w")
 f.write(html_out)
