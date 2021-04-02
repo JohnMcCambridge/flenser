@@ -191,6 +191,14 @@ for i in range(0, len(results)):
 
 html_top_table = top_table.to_markdown(tablefmt='html')
 
+top_table_wide = top_table[['Column Name', 'Tests Triggered']].explode('Tests Triggered')
+top_table_wide[['X']] = 'X'
+top_table_wide = top_table_wide.pivot(index='Column Name', columns='Tests Triggered', values='X')
+top_table_wide.fillna('', inplace=True)
+
+top_table_mega = top_table.join(top_table_wide, on='Column Name')
+html_top_table_mega = top_table_mega.to_markdown(tablefmt='html')
+
 
 def build_output(column_name, column, column_results):
     column_results_list = [result.name for result in column_results]
@@ -229,7 +237,7 @@ page_output = run_page(results)
 
 html_close = "</body></html>"
 
-html_out = html_open + html_filename + html_row_col + html_nan + html_top_table + page_output + html_close
+html_out = html_open + html_filename + html_row_col + html_nan + html_top_table + """<br><br>""" + html_top_table_mega + """<br><br>""" + page_output + html_close
 
 f = open("flenser_output.html", "w")
 f.write(html_out)
