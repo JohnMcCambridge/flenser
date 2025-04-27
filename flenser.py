@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+import html
+import re
 
 import platform
 import sys
@@ -30,6 +32,34 @@ nan_locations.index.name = 'column name'
 nan_locations.name = 'NANs found'
 html_nan_locations = nan_locations.to_markdown(tablefmt='html')
 
+# Helper function to find values matching nans with surrounding spaces
+def find_nans_with_spaces(column, nans_list):
+    # Create a regex pattern: optional spaces + any nan value + optional spaces
+    # Escape regex special characters in nan values first
+    escaped_nans_for_regex = [re.escape(nan) for nan in nans_list if nan] # Exclude empty string from direct regex matching if needed
+    # Handle empty string separately if it's in nans
+    patterns = []
+    if '' in nans_list:
+        patterns.append(r'^\s+$') # Match strings containing only spaces
+
+    if escaped_nans_for_regex:
+         patterns.append(r'^\s*(' + '|'.join(escaped_nans_for_regex) + r')\s*$')
+
+    if not patterns:
+        # Return an empty array consistent with .unique() output
+        return np.array([], dtype=object)
+
+    full_pattern = '|'.join(patterns)
+    # Operate on the column as strings
+    col_str = column.astype(str)
+    # Find values that match the pattern but are NOT exact matches in the original nans list
+    matches = column[col_str.str.fullmatch(full_pattern, na=False) & ~column.isin(nans_list)]
+    return matches.unique()
+
+# Pre-calculate the results for the new test BEFORE replacing NaNs
+nans_with_spaces_results = df.apply(lambda col: find_nans_with_spaces(col, nans))
+
+# Replace identified NaNs with pandas NA object AFTER checking for spaced ones
 df.replace(nans, pd.NA, inplace=True)
 
 
@@ -39,6 +69,7 @@ class Test:
     condition: Any
     to_html: Any
 
+#helper functions for Tests
 
 def length_table(column):
     a = column.astype(str).str.len().value_counts(normalize=True, dropna=True).round(4) * 100
@@ -131,13 +162,15 @@ tests = [
     ),
     Test(
         'salesforceid_15',
-        lambda column: column.astype(str).str.fullmatch("[a-zA-Z0-9]{15}").any(),
-        lambda column: "one of more entries could be Salesforce IDs (15 characters)"
+        # Use a more specific regex requiring both letters and numbers
+        lambda column: column.astype(str).str.fullmatch(r"^(?=.*[a-zA-Z])(?=.*[0-9])[a-zA-Z0-9]{15}$").any(),
+        lambda column: f"one or more entries match the structure of Salesforce IDs (15 chars, mixed alpha/numeric): '{column.dropna().unique()[0]}'"
     ),
     Test(
         'salesforceid_18',
-        lambda column: column.astype(str).str.fullmatch("[a-zA-Z0-9]{18}").any(),
-        lambda column: "one of more entries could be Salesforce IDs (18 characters)"
+        # Use a more specific regex requiring both letters and numbers
+        lambda column: column.astype(str).str.fullmatch(r"^(?=.*[a-zA-Z])(?=.*[0-9])[a-zA-Z0-9]{18}$").any(),
+        lambda column: f"one or more entries match the structure of Salesforce IDs (18 chars, mixed alpha/numeric): '{column.dropna().unique()[0]}"
     ),
     Test(
         'numeric_only',
@@ -154,6 +187,34 @@ tests = [
         lambda column: column.dropna().astype(str).str.isalpha().all(),
         lambda column: "all values are alpha only (or nan) (no spaces, no specials)"
     ),
+    Test(
+        'matches_nan_with_spaces',
+        lambda column: len(nans_with_spaces_results[column.name]) > 0,
+        lambda column: f"Values matching NANs with surrounding spaces found: {html.escape(str(nans_with_spaces_results[column.name]))}"
+    ),
+    Test(
+        'leading_trailing_spaces',
+        # Check if any non-NA string value has different length after stripping
+        lambda column: column.dropna().astype(str).pipe(lambda s: s.str.len().ne(s.str.strip().str.len())).any(),
+        lambda column:(
+            lambda cleaned_strings:
+                f"Column contains values with leading/trailing spaces: {str(sample_without_replacement(cleaned_strings[cleaned_strings.ne(cleaned_strings.str.strip())]))}"
+                )(column.dropna().astype(str))
+    ),
+    Test(
+        'boolean_like',
+        lambda column: column.nunique() == 2,
+        lambda column: f"column appears boolean (exactly two distinct non-NA values): '{column.dropna().unique()[0]}' and '{column.dropna().unique()[1]}'"
+    ),
+Test(
+        'leading_zeros',
+        lambda column: column.dropna().astype(str).str.match(r'^0[0-9]+$').any(),
+        lambda column: (
+            lambda preprocessed_strings:
+                f"Contains leading zeros: {str(sample_without_replacement(preprocessed_strings[preprocessed_strings.str.match(r'^0[0-9]+$')]
+                ).tolist())}"
+                )(column.dropna().astype(str))
+),
     Test(
         'common_lengths',
         lambda column: 0 < column.astype(str).str.len().nunique() < 5,
@@ -227,7 +288,8 @@ html_open = f.read()
 
 html_filename = str(filename) + """<br><br>"""
 html_row_col = "Rows: " + str(df.shape[0]) + ", Columns: " + str(df.shape[1]) + """<br><br>"""
-html_nan = "NANs searched for: " + str(nans) + """<br>""" + "NANs found: " + str(found_nans) + """<br><br>"""
+# Escape the lists *only* when creating the HTML string
+html_nan = "NANs searched for: " + str([html.escape(nan) for nan in nans]) + """<br>""" + "NANs found: " + str([html.escape(nan) for nan in found_nans]) + """<br><br>"""
 
 page_output = run_page(results)
 
