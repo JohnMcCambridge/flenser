@@ -25,7 +25,7 @@ found_nans = df[df.isin(nans)].values
 found_nans = np.unique(found_nans[~(pd.isnull(found_nans))])
 
 nan_locations_all = df.apply(lambda column: column[column.isin(found_nans)].unique(), axis = 0)
-nan_locations = nan_locations_all[nan_locations_all.str.len().gt(0)]
+nan_locations = nan_locations_all[nan_locations_all.apply(len).gt(0)]
 nan_locations.index.name = 'column name'
 nan_locations.name = 'NANs found'
 html_nan_locations = nan_locations.to_markdown(tablefmt='html')
@@ -41,20 +41,21 @@ class Test:
 
 
 def length_table(column):
-    a = column.str.len().value_counts(normalize=True, dropna=True).round(4) * 100
+    a = column.astype(str).str.len().value_counts(normalize=True, dropna=True).round(4) * 100
     a.index.name = 'Value Lengths'
     a.name = '% of Total'
     a = a.to_frame()
     a['Examples'] = ""
 
     for i in range(0, len(a)):
-        mask = column.str.len() == a.index[i]
+        mask = column.astype(str).str.len() == a.index[i]
         if column.loc[mask].nunique() > 3:
             sample_size = 3
         else:
             sample_size = column.loc[mask].nunique()
         example_values = np.random.choice(column.loc[mask].unique(), sample_size, replace=False)
-        a['Examples'].values[i] = example_values
+        # Convert numpy array to string for tabulate
+        a['Examples'].values[i] = str(example_values)
 
     a = a.to_markdown(tablefmt='html')
     return a
@@ -115,48 +116,48 @@ tests = [
     ),
     Test(
         'row_index_0',
-        lambda column: all(column.astype(int, errors='ignore').sort_values().eq(column.index.values)),
+        lambda column: pd.to_numeric(column, errors='coerce').notna().all() and all(pd.to_numeric(column).sort_values().eq(column.index.values)),
         lambda column: "column values form a row index, initialized at zero"
     ),
     Test(
         'row_index_1',
-        lambda column: all(column.astype(int, errors='ignore').sort_values().eq(column.index.values + 1)),
+        lambda column: pd.to_numeric(column, errors='coerce').notna().all() and all(pd.to_numeric(column).sort_values().eq(column.index.values + 1)),
         lambda column: "column values form a row index, initialized at one"
     ),
     Test(
         'strip_and_casefold_collapse',
-        lambda column: column.str.strip().str.casefold().nunique == column.nunique(),
+        lambda column: column.astype(str).str.strip().str.casefold().nunique() < column.nunique(),
         lambda column: "whitespace and/or casefolding merges one or more values"
     ),
     Test(
         'salesforceid_15',
-        lambda column: column.str.fullmatch("[a-zA-Z0-9]{15}").any(),
+        lambda column: column.astype(str).str.fullmatch("[a-zA-Z0-9]{15}").any(),
         lambda column: "one of more entries could be Salesforce IDs (15 characters)"
     ),
     Test(
         'salesforceid_18',
-        lambda column: column.str.fullmatch("[a-zA-Z0-9]{18}").any(),
+        lambda column: column.astype(str).str.fullmatch("[a-zA-Z0-9]{18}").any(),
         lambda column: "one of more entries could be Salesforce IDs (18 characters)"
     ),
     Test(
         'numeric_only',
-        lambda column: column.dropna().str.isnumeric().all(),
+        lambda column: column.dropna().astype(str).str.isnumeric().all(),
         lambda column: "all values are numeric only (or nan)"
     ),
     Test(
         'numeric_only_unique_over_max',
-        lambda column: column.dropna().str.isnumeric().all() & column.nunique() > 25,
-        lambda column: "min value: " + str(column.min(skipna=True)) + "  max value: " + str(column.max(skipna=True))
+        lambda column: column.dropna().astype(str).str.isnumeric().all() & column.nunique() > 25,
+        lambda column: "min value: " + str(pd.to_numeric(column, errors='coerce').min(skipna=True)) + "  max value: " + str(pd.to_numeric(column, errors='coerce').max(skipna=True))
     ),
     Test(
         'alpha_only',
-        lambda column: column.dropna().str.isalpha().all(),
+        lambda column: column.dropna().astype(str).str.isalpha().all(),
         lambda column: "all values are alpha only (or nan) (no spaces, no specials)"
     ),
     Test(
         'common_lengths',
-        lambda column: 0 < column.str.len().nunique() < 5,
-        lambda column: length_table(column)
+        lambda column: 0 < column.astype(str).str.len().nunique() < 5,
+        lambda column: length_table(column.astype(str))
     ),
     Test(
         'unique_under_max',
@@ -165,7 +166,7 @@ tests = [
     ),
     Test(
         'contains_numeric',
-        lambda column: column.str.isnumeric().any(),
+        lambda column: column.astype(str).str.isnumeric().any(),
         lambda column: pd.to_numeric(column, errors='coerce').describe().to_markdown(tablefmt='html')
     )
 
@@ -186,8 +187,10 @@ results = df.apply(run_tests, axis=0)
 top_table = pd.DataFrame(index=range(len(results)), columns=['Column Name', 'NANs found', 'Tests Triggered'])
 for i in range(0, len(results)):
     top_table.values[i][0] = results.keys()[i]
-    top_table.values[i][1] = nan_locations_all[i]
-    top_table.values[i][2] = [result.name for result in results[i]]
+    # Use .iloc for positional access to prevent FutureWarning
+    top_table.values[i][1] = str(nan_locations_all.iloc[i])
+    # Use .iloc for positional access to prevent FutureWarning
+    top_table.values[i][2] = [result.name for result in results.iloc[i]]
 
 html_top_table = top_table.to_markdown(tablefmt='html')
 
@@ -211,7 +214,8 @@ def run_page(results):
     filled_page = ""
     for i in range(0, len(results)):
         column_name = results.keys()[i]
-        column_results = results[i]
+        # Use .iloc for positional access to prevent FutureWarning
+        column_results = results.iloc[i]
         column = df[column_name]
 
         filled_page += build_output(column_name, column, column_results)
